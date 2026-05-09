@@ -3,11 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" 
+        content="default-src 'self'; 
+                 script-src 'self' https://unpkg.com 'unsafe-inline'; 
+                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+                 font-src https://fonts.gstatic.com; 
+                 connect-src 'self'; 
+                 img-src 'self' data: blob:;">
   <title>星澜 Star - AI智能播客</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.js"></script>
   <style>
     :root {
       --bg-primary: #0a0e1a;
@@ -2250,6 +2257,22 @@
   </div>
 
   <script>
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    window.addEventListener('error', (e) => {
+      console.error('Global error:', e.message);
+      if (typeof UI !== 'undefined' && UI.showToast) {
+        UI.showToast('应用异常，请刷新页面重试');
+      }
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.error('Unhandled promise:', e.reason);
+    });
+
     const App = {
       data: {
         podcasts: [],
@@ -2421,7 +2444,7 @@
           list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">暂无播放历史</div>';
           return;
         }
-        const items = history.reverse().map(id => {
+        const items = [...history].reverse().map(id => {
           const p = this.data.podcasts.find(p => p.id === id);
           if (!p) return '';
           return `
@@ -2517,7 +2540,10 @@
         try {
           const stored = localStorage.getItem('star_app_state');
           if (stored) this.data = JSON.parse(stored);
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Store init failed:', e);
+          this.data = {};
+        }
         if (!this.data.user) this.data.user = null;
         if (!this.data.favorites) this.data.favorites = [];
         if (!this.data.history) this.data.history = [];
@@ -2531,7 +2557,10 @@
         this.data[key] = value;
         try {
           localStorage.setItem('star_app_state', JSON.stringify(this.data));
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Store save failed:', e);
+          UI.showToast('存储空间已满，部分数据可能丢失');
+        }
       },
       subscribe(key, callback) {
         const originalSet = this.set.bind(this);
@@ -2857,7 +2886,7 @@
         }
         const user = {
           id: 'user_' + Date.now(),
-          nickname: account.includes('@') ? account.split('@')[0] : '用户' + account.slice(-4),
+          nickname: account.includes('@') ? escapeHtml(account.split('@')[0]) : '用户' + escapeHtml(account.slice(-4)),
           avatar: '👤',
           account
         };
@@ -2891,7 +2920,7 @@
         }
         const user = {
           id: 'user_' + Date.now(),
-          nickname,
+          nickname: escapeHtml(nickname),
           avatar: '👤',
           account
         };
@@ -3090,8 +3119,8 @@
         const id = 'ai_' + Date.now();
         const newPodcast = {
           id,
-          title: `AI创作: ${topic}`,
-          description: `由AI生成的播客，风格：${this.selectedStyle}，包含：${this.tags.join('、') || '标准设置'}`,
+          title: `AI创作: ${escapeHtml(topic)}`,
+          description: `由AI生成的播客，风格：${this.selectedStyle}，包含：${this.tags.map(escapeHtml).join('、') || '标准设置'}`,
           icon: '✨',
           gradient: 'linear-gradient(135deg, #6366f1, #a855f7)',
           author: '星澜AI',
